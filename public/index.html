@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATL Video Editor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>ATL Video Editor</h1>
+      <p>Auto-generate MP4 videos with HyperFrames</p>
+    </header>
+    <main>
+      <form id="editor" class="editor">
+        <label>
+          Title
+          <input type="text" id="title" value="Hello ATL" maxlength="60">
+        </label>
+        <label>
+          Subtitle
+          <input type="text" id="subtitle" value="Powered by HyperFrames" maxlength="120">
+        </label>
+        <div class="row">
+          <label>
+            Duration (s)
+            <input type="number" id="duration" value="5" min="1" max="60" step="1">
+          </label>
+          <label>
+            FPS
+            <select id="fps">
+              <option value="24">24</option>
+              <option value="30" selected>30</option>
+              <option value="60">60</option>
+            </select>
+          </label>
+          <label>
+            Quality
+            <select id="quality">
+              <option value="draft">Draft</option>
+              <option value="standard" selected>Standard</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <label>
+            Width
+            <input type="number" id="width" value="1920" step="10">
+          </label>
+          <label>
+            Height
+            <input type="number" id="height" value="1080" step="10">
+          </label>
+        </div>
+        <div class="row">
+          <label>
+            Background
+            <input type="color" id="bgColor" value="#0f172a">
+          </label>
+          <label>
+            Text
+            <input type="color" id="textColor" value="#ffffff">
+          </label>
+        </div>
+        <button type="submit" id="renderBtn">Render Video</button>
+      </form>
+      <section class="preview">
+        <div id="status" class="status hidden"></div>
+        <video id="outputVideo" controls class="hidden"></video>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
