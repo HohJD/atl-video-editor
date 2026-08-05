@@ -305,8 +305,8 @@ function buildSlideshow({ safeTitle, safeSubtitle, duration, width, height, bgCo
   });
 
   const titleDuration = Math.min(duration, 2.5);
-  html += textOverlay({ id: 'title', text: safeTitle, start: 0, duration: titleDuration, width, height, textColor, fontSize: Math.min(width > height ? 84 : 100, width / 12), y: height * 0.08, track: 1 });
-  html += textOverlay({ id: 'subtitle', text: safeSubtitle, start: 0.5, duration: Math.max(0, titleDuration - 0.5), width, height, textColor, fontSize: Math.min(width > height ? 36 : 44, width / 24), y: height * 0.18, track: 2 });
+  html += textOverlay({ id: 'title', text: safeTitle, start: 0, duration: titleDuration, width, height, textColor, fontSize: Math.min(width > height ? 80 : 96, width / 14), y: height * 0.08, track: 1 });
+  html += textOverlay({ id: 'subtitle', text: safeSubtitle, start: 0.5, duration: Math.max(0, titleDuration - 0.5), width, height, textColor, fontSize: Math.min(width > height ? 32 : 40, width / 26), y: height * 0.26, track: 2 });
 
   if (audios[0]) {
     html += `    <audio src="assets/${audios[0].filename}" data-start="0" data-track-index="99" data-volume="0.5"><\/audio>`;

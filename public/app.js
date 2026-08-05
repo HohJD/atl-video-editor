@@ -17,10 +17,12 @@ const templateCards = document.querySelectorAll('.template-card');
 const aspectPicker = document.getElementById('aspectPicker');
 const playhead = document.getElementById('playhead');
 const timelineDuration = document.getElementById('timelineDuration');
+const toastEl = document.getElementById('toast');
 
 let assets = [];
 let selectedTemplate = 'auto';
 let currentOutput = null;
+let statusTimeout;
 
 const MODELS = {
   anthropic: [
@@ -34,6 +36,20 @@ const MODELS = {
     { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' }
   ]
 };
+
+const TEMPLATE_DEFAULTS = {
+  'simple-title': { w: 1920, h: 1080 },
+  'product-intro': { w: 1920, h: 1080 },
+  'slideshow': { w: 1920, h: 1080 },
+  'social-clip': { w: 1080, h: 1920 }
+};
+
+function showToast(text, type = 'info', duration = 4000) {
+  clearTimeout(statusTimeout);
+  toastEl.textContent = text;
+  toastEl.className = `toast show ${type}`;
+  statusTimeout = setTimeout(() => toastEl.classList.remove('show'), duration);
+}
 
 function populateModels() {
   const provider = aiProvider.value;
@@ -49,6 +65,7 @@ function populateModels() {
 function showGenerating(show) {
   generating.classList.toggle('hidden', !show);
   generateBtn.disabled = show;
+  generateBtn.textContent = show ? 'Generating…' : 'Generate';
 }
 
 function setOutput(url) {
@@ -84,6 +101,18 @@ function updatePreviewAspect(w, h) {
   wrap.style.aspectRatio = `${w} / ${h}`;
 }
 
+function setDimensions(w, h) {
+  document.getElementById('width').value = w;
+  document.getElementById('height').value = h;
+  updatePreviewAspect(w, h);
+}
+
+function setActiveAspectButton(w, h) {
+  aspectPicker.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  const match = [...aspectPicker.querySelectorAll('button')].find(b => b.dataset.w === String(w) && b.dataset.h === String(h));
+  if (match) match.classList.add('active');
+}
+
 function renderMedia() {
   mediaList.innerHTML = '';
   assets.forEach((asset, i) => {
@@ -91,7 +120,7 @@ function renderMedia() {
     el.className = 'media-item';
     el.setAttribute('data-type', asset.type);
 
-    let thumb = `<div class="thumb" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:0.7rem;">${asset.type}</div>`;
+    let thumb = `<div class="thumb" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:0.7rem;text-transform:uppercase;">${asset.type}</div>`;
     if (asset.type === 'image') {
       thumb = `<img class="thumb" src="${asset.url}" alt="">`;
     } else if (asset.type === 'video') {
@@ -100,7 +129,7 @@ function renderMedia() {
 
     el.innerHTML = `
       <span class="tag">${asset.type}</span>
-      <button class="remove" data-index="${i}">X</button>
+      <button class="remove" data-index="${i}" title="Remove">×</button>
       ${thumb}
       <div class="name">${escapeHtml(asset.name)}</div>
     `;
@@ -108,6 +137,7 @@ function renderMedia() {
       assets.splice(i, 1);
       renderMedia();
       renderTimeline();
+      showToast('Asset removed', 'info');
     });
     mediaList.appendChild(el);
   });
@@ -115,6 +145,7 @@ function renderMedia() {
 
 async function uploadFiles(files) {
   if (!files.length) return;
+  showToast('Uploading…', 'info', 10000);
   const formData = new FormData();
   for (const f of files) formData.append('files', f);
   try {
@@ -124,8 +155,9 @@ async function uploadFiles(files) {
     assets = assets.concat(uploaded);
     renderMedia();
     renderTimeline();
+    showToast(`${assets.length} asset(s) imported`, 'success');
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, 'error');
   }
 }
 
@@ -148,16 +180,42 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
+function resolveTemplateUI(template, prompt, assets) {
+  if (template && template !== 'auto') return template;
+  const p = (prompt || '').toLowerCase();
+  const hasVideo = assets.some(a => a.type === 'video');
+  const hasImage = assets.some(a => a.type === 'image');
+  if (hasImage && p.includes('slideshow')) return 'slideshow';
+  if (hasVideo && (p.includes('social') || p.includes('tiktok') || p.includes('reels') || p.includes('vertical') || p.includes('story'))) return 'social-clip';
+  if (hasVideo && (p.includes('intro') || p.includes('promo') || p.includes('trailer'))) return 'product-intro';
+  if (hasVideo) return 'product-intro';
+  if (hasImage) return 'slideshow';
+  return 'simple-title';
+}
+
+function applyTemplateDefaults(template) {
+  const defs = TEMPLATE_DEFAULTS[template];
+  if (defs) {
+    setDimensions(defs.w, defs.h);
+    setActiveAspectButton(defs.w, defs.h);
+  }
+}
+
 templateCards.forEach(card => {
   card.addEventListener('click', () => {
     templateCards.forEach(c => c.classList.remove('active'));
     card.classList.add('active');
     selectedTemplate = card.dataset.template;
+    if (selectedTemplate !== 'auto') applyTemplateDefaults(selectedTemplate);
     renderTimeline();
+    showToast(`${card.querySelector('strong').textContent} template selected`, 'info');
   });
 });
 
-aiEnabled.addEventListener('change', () => aiSettings.classList.toggle('hidden', !aiEnabled.checked));
+aiEnabled.addEventListener('change', () => {
+  aiSettings.classList.toggle('hidden', !aiEnabled.checked);
+  showToast(aiEnabled.checked ? 'AI Director enabled' : 'AI Director disabled', 'info');
+});
 aiProvider.addEventListener('change', populateModels);
 
 toggleKey.addEventListener('click', () => {
@@ -171,9 +229,7 @@ aspectPicker.addEventListener('click', e => {
   if (!btn) return;
   aspectPicker.querySelectorAll('button').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('width').value = btn.dataset.w;
-  document.getElementById('height').value = btn.dataset.h;
-  updatePreviewAspect(btn.dataset.w, btn.dataset.h);
+  setDimensions(btn.dataset.w, btn.dataset.h);
 });
 
 ['width', 'height'].forEach(id => {
@@ -196,7 +252,7 @@ function renderTimeline() {
   videoLane.innerHTML = '';
   audioLane.innerHTML = '';
 
-  const template = selectedTemplate;
+  const template = resolveTemplateUI(selectedTemplate, promptEl.value, assets);
   const videos = assets.filter(a => a.type === 'video');
   const images = assets.filter(a => a.type === 'image');
   const audios = assets.filter(a => a.type === 'audio');
@@ -207,12 +263,11 @@ function renderTimeline() {
     const el = document.createElement('div');
     el.className = `clip ${cls}`;
     el.style.left = left + '%';
-    el.style.width = width + '%';
+    el.style.width = Math.max(width, 0) + '%';
     el.textContent = label;
     lane.appendChild(el);
   };
 
-  // Text overlay spans full duration
   makeClip(textLane, 'text', 0, duration, getStyleValues().title);
 
   if (template === 'slideshow' && images.length) {
@@ -230,14 +285,22 @@ function renderTimeline() {
 ['title', 'subtitle', 'duration', 'width', 'height', 'fps', 'quality', 'bgColor', 'textColor'].forEach(id => {
   document.getElementById(id).addEventListener('input', renderTimeline);
 });
+promptEl.addEventListener('input', renderTimeline);
 
 async function generate() {
   if (aiEnabled.checked && !aiApiKey.value.trim()) {
-    alert('Please enter an API key to use AI generation.');
+    showToast('Please enter an API key to use AI generation.', 'error');
+    return;
+  }
+
+  const resolved = resolveTemplateUI(selectedTemplate, promptEl.value, assets);
+  if (!assets.length && resolved !== 'simple-title') {
+    showToast('Import at least one media file, or choose the Title / Auto template.', 'error');
     return;
   }
 
   showGenerating(true);
+  showToast('Building composition…', 'info', 120000);
   const style = getStyleValues();
 
   const payload = {
@@ -269,14 +332,17 @@ async function generate() {
     const data = await res.json();
     setOutput(data.outputUrl);
     if (data.plan) {
-      document.getElementById('width').value = data.plan.width;
-      document.getElementById('height').value = data.plan.height;
+      setDimensions(data.plan.width, data.plan.height);
       document.getElementById('duration').value = data.plan.duration;
-      updatePreviewAspect(data.plan.width, data.plan.height);
+      if (data.plan.template && data.plan.template !== 'auto') {
+        selectedTemplate = data.plan.template;
+        templateCards.forEach(c => c.classList.toggle('active', c.dataset.template === selectedTemplate));
+      }
     }
     renderTimeline();
+    showToast(`Done — ${Math.round(data.size / 1024)} KB · ${data.template}`, 'success');
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, 'error', 8000);
   } finally {
     showGenerating(false);
   }
@@ -290,6 +356,7 @@ exportBtn.addEventListener('click', () => {
   a.href = currentOutput + '?download=1';
   a.download = 'atl-video.mp4';
   a.click();
+  showToast('MP4 download started', 'success');
 });
 
 outputVideo.addEventListener('timeupdate', () => {
@@ -299,6 +366,12 @@ outputVideo.addEventListener('timeupdate', () => {
   }
 });
 
+outputVideo.addEventListener('loadedmetadata', () => {
+  playhead.style.left = '0%';
+});
+
 populateModels();
-updatePreviewAspect(1920, 1080);
+setDimensions(1920, 1080);
+setActiveAspectButton(1920, 1080);
 renderTimeline();
+showToast('Ready — import media and click Generate', 'info');

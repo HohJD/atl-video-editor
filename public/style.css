@@ -57,6 +57,29 @@ html, body {
 
 .actions { display: flex; gap: 10px; }
 
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity .2s, transform .2s;
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  max-width: 80vw;
+  text-align: center;
+}
+
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.info { background: #1e293b; color: #cbd5e1; }
+.toast.success { background: #064e3b; color: #a7f3d0; }
+.toast.error { background: #450a0a; color: #fecaca; }
+
 button {
   border: none;
   border-radius: 8px;
@@ -70,6 +93,7 @@ button {
 }
 
 button:hover { opacity: .9; }
+button:disabled { opacity: .4; cursor: not-allowed; }
 
 button.primary {
   background: linear-gradient(90deg, var(--accent), var(--accent2));
