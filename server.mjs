@@ -10,9 +10,10 @@ import multer from 'multer';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
-const PROJECTS_DIR = path.join(__dirname, 'projects');
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
+const PROJECTS_DIR = process.env.ATL_PROJECTS_DIR || path.join(__dirname, 'projects');
+const UPLOADS_DIR = process.env.ATL_UPLOADS_DIR || path.join(__dirname, 'uploads');
 const CLI = path.join(__dirname, 'node_modules', 'hyperframes', 'bin', 'hyperframes.mjs');
+const NODE_EXE = process.env.ATL_NODE_EXE || process.execPath;
 
 const app = express();
 app.use(cors());
@@ -434,7 +435,7 @@ app.post('/api/render', async (req, res) => {
   const outputPath = path.join(projectDir, outputName);
 
   const args = ['render', '-o', outputName, '-f', String(final.fps), '-q', final.quality];
-  const child = spawn('node', [CLI, ...args], { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(NODE_EXE, [CLI, ...args], { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } });
 
   let stdout = '';
   let stderr = '';

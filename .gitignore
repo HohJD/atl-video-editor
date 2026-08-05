@@ -3,3 +3,6 @@ projects/
 uploads/
 *.log
 .env
+release-builds/
+dist/
+.DS_Store

@@ -3,14 +3,17 @@
   "version": "1.0.0",
   "description": "Automated video editor powered by HyperFrames",
   "type": "module",
-  "main": "server.mjs",
+  "main": "electron/main.cjs",
   "scripts": {
     "start": "node server.mjs",
     "dev": "node server.mjs",
+    "electron": "electron .",
+    "pack": "electron-builder",
+    "dist": "electron-builder --publish=never",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
+  "author": "ATL Video Editor <support@atlvideo.app>",
   "license": "ISC",
   "dependencies": {
     "@hyperframes/producer": "^0.7.90",
@@ -19,5 +22,55 @@
     "hyperframes": "^0.7.90",
     "multer": "^2.2.0",
     "uuid": "^14.0.1"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.atlvideoeditor.app",
+    "productName": "ATL Video Editor",
+    "icon": "build/icon.png",
+    "directories": {
+      "output": "release-builds"
+    },
+    "files": [
+      "electron/**/*",
+      "server.mjs",
+      "public/**/*",
+      "build/icon.png",
+      "node_modules/**/*"
+    ],
+    "asar": false,
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "AudioVideo;Video"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "public.app-category.video"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    }
   }
 }
