@@ -10,91 +10,144 @@
   <div class="app">
     <header>
       <h1>ATL Video Editor</h1>
-      <p>Upload footage, pick a template, describe it — HyperFrames does the rest</p>
+      <p>Upload footage, describe your idea, and auto-render MP4 videos with HyperFrames</p>
     </header>
     <main>
       <form id="editor" class="editor">
-        <label>
-          Template
-          <select id="template">
-            <option value="auto" selected>Auto (infer from prompt)</option>
-            <option value="simple-title">Title card</option>
-            <option value="product-intro">Product intro</option>
-            <option value="slideshow">Slideshow</option>
-            <option value="social-clip">Social clip / Reels</option>
-          </select>
-        </label>
-
-        <label>
-          Describe your video (prompt)
-          <textarea id="prompt" rows="3" placeholder="E.g., a 15s product intro with upbeat music, or a slideshow of my vacation photos"></textarea>
-        </label>
-
-        <label>
-          Upload footage
+        <section class="panel">
+          <h2>Media</h2>
           <input type="file" id="fileInput" multiple accept="video/*,image/*,audio/*">
-        </label>
-        <div id="uploadArea" class="upload-area">
-          <p>Drag & drop videos, images, or audio here</p>
-          <button type="button" id="browseBtn" class="secondary">Browse files</button>
-        </div>
-        <ul id="assetList" class="asset-list"></ul>
+          <div id="uploadArea" class="upload-area">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p>Drag &amp; drop videos, images, or audio here</p>
+            <button type="button" id="browseBtn" class="secondary">Browse files</button>
+          </div>
+          <ul id="assetList" class="asset-list"></ul>
+        </section>
 
-        <label>
-          Title
-          <input type="text" id="title" value="Hello ATL" maxlength="60">
-        </label>
-        <label>
-          Subtitle
-          <input type="text" id="subtitle" value="Powered by HyperFrames" maxlength="120">
-        </label>
-        <div class="row">
-          <label>
-            Duration (s)
-            <input type="number" id="duration" value="5" min="1" max="120" step="1">
+        <section class="panel">
+          <h2>AI Director</h2>
+          <label class="toggle">
+            <input type="checkbox" id="aiEnabled">
+            <span>Enable AI to generate the scene from my prompt</span>
           </label>
+
+          <div id="aiSettings" class="ai-settings hidden">
+            <div class="row">
+              <label>
+                Provider
+                <select id="aiProvider">
+                  <option value="anthropic" selected>Anthropic Claude</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+              </label>
+              <label>
+                Model
+                <select id="aiModel"></select>
+              </label>
+            </div>
+
+            <label>
+              API key
+              <div class="password-wrap">
+                <input type="password" id="aiApiKey" placeholder="sk-... or sk-ant-...">
+                <button type="button" id="toggleKey" class="icon">Show</button>
+              </div>
+              <small>Your key is only used for this render and is not stored on the server.</small>
+            </label>
+          </div>
+
           <label>
-            FPS
-            <select id="fps">
-              <option value="24">24</option>
-              <option value="30" selected>30</option>
-              <option value="60">60</option>
+            Describe your video
+            <textarea id="prompt" rows="4" placeholder="E.g., a 15s product intro with my video as background, bold white text on a dark blue gradient, 1920x1080"></textarea>
+          </label>
+        </section>
+
+        <section class="panel">
+          <h2>Style & Output</h2>
+          <label>
+            Template override (used when AI is off)
+            <select id="template">
+              <option value="auto" selected>Auto (infer from prompt)</option>
+              <option value="simple-title">Title card</option>
+              <option value="product-intro">Product intro</option>
+              <option value="slideshow">Slideshow</option>
+              <option value="social-clip">Social clip / Reels</option>
             </select>
           </label>
-          <label>
-            Quality
-            <select id="quality">
-              <option value="draft">Draft</option>
-              <option value="standard" selected>Standard</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-        </div>
-        <div class="row">
-          <label>
-            Width
-            <input type="number" id="width" value="1920" step="10">
-          </label>
-          <label>
-            Height
-            <input type="number" id="height" value="1080" step="10">
-          </label>
-        </div>
-        <div class="row">
-          <label>
-            Background
-            <input type="color" id="bgColor" value="#0f172a">
-          </label>
-          <label>
-            Text
-            <input type="color" id="textColor" value="#ffffff">
-          </label>
-        </div>
-        <button type="submit" id="renderBtn">Render Video</button>
+
+          <div class="row">
+            <label>
+              Title
+              <input type="text" id="title" value="Hello ATL" maxlength="60">
+            </label>
+            <label>
+              Subtitle
+              <input type="text" id="subtitle" value="Powered by HyperFrames" maxlength="120">
+            </label>
+          </div>
+
+          <div class="row">
+            <label>
+              Duration (s)
+              <input type="number" id="duration" value="5" min="1" max="120" step="1">
+            </label>
+            <label>
+              FPS
+              <select id="fps">
+                <option value="24">24</option>
+                <option value="30" selected>30</option>
+                <option value="60">60</option>
+              </select>
+            </label>
+            <label>
+              Quality
+              <select id="quality">
+                <option value="draft">Draft</option>
+                <option value="standard" selected>Standard</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+          </div>
+
+          <label>Aspect ratio preset</label>
+          <div class="segmented" id="aspectRatio">
+            <button type="button" data-w="1920" data-h="1080" class="active">Landscape 16:9</button>
+            <button type="button" data-w="1080" data-h="1920">Portrait 9:16</button>
+            <button type="button" data-w="1080" data-h="1080">Square 1:1</button>
+          </div>
+
+          <div class="row">
+            <label>
+              Width
+              <input type="number" id="width" value="1920" step="10">
+            </label>
+            <label>
+              Height
+              <input type="number" id="height" value="1080" step="10">
+            </label>
+          </div>
+
+          <div class="row">
+            <label>
+              Background
+              <input type="color" id="bgColor" value="#0f172a">
+            </label>
+            <label>
+              Text
+              <input type="color" id="textColor" value="#ffffff">
+            </label>
+          </div>
+
+          <button type="submit" id="renderBtn">Render Video</button>
+        </section>
       </form>
+
       <section class="preview">
         <div id="status" class="status hidden"></div>
         <video id="outputVideo" controls class="hidden"></video>
+        <a id="downloadBtn" class="download hidden" href="#" download="atl-video.mp4">Download MP4</a>
+        <pre id="planBox" class="plan hidden"></pre>
       </section>
     </main>
   </div>

@@ -27,7 +27,7 @@ const upload = multer({
       cb(null, `${randomUUID().slice(0, 8)}-${safe}`);
     }
   }),
-  limits: { fileSize: 500 * 1024 * 1024 } // 500 MB per file
+  limits: { fileSize: 1024 * 1024 * 1024 } // 1 GB per file
 });
 
 function escapeHtml(str) {
@@ -60,22 +60,127 @@ function resolveTemplate(template, prompt, assets) {
   return 'simple-title';
 }
 
-function buildComposition({ title, subtitle, duration, width, height, fps, bgColor, textColor, template, prompt, assets }) {
+const VALID_TEMPLATES = ['simple-title', 'product-intro', 'slideshow', 'social-clip'];
+const VALID_QUALITY = ['draft', 'standard', 'high'];
+const VALID_FPS = [24, 25, 30, 50, 60];
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function isHexColor(c) {
+  return /^#([0-9A-Fa-f]{3}){1,2}$/.test(String(c));
+}
+
+function sanitizePlan(plan, defaults) {
+  if (!plan || typeof plan !== 'object') return null;
+  const out = { ...defaults };
+  if (VALID_TEMPLATES.includes(plan.template)) out.template = plan.template;
+  if (typeof plan.title === 'string') out.title = plan.title.slice(0, 120);
+  if (typeof plan.subtitle === 'string') out.subtitle = plan.subtitle.slice(0, 240);
+  if (typeof plan.duration === 'number') out.duration = clamp(Math.round(plan.duration), 1, 120);
+  if (typeof plan.width === 'number') out.width = clamp(Math.round(plan.width), 64, 3840);
+  if (typeof plan.height === 'number') out.height = clamp(Math.round(plan.height), 64, 3840);
+  if (VALID_FPS.includes(plan.fps)) out.fps = plan.fps;
+  if (VALID_QUALITY.includes(plan.quality)) out.quality = plan.quality;
+  if (isHexColor(plan.bgColor)) out.bgColor = plan.bgColor;
+  if (isHexColor(plan.textColor)) out.textColor = plan.textColor;
+  return out;
+}
+
+function parseJSON(text) {
+  const cleaned = String(text).trim().replace(/^```json\s*|\s*```$/g, '');
+  return JSON.parse(cleaned);
+}
+
+function buildPlanPrompt({ prompt, assets, defaults }) {
+  const counts = { video: 0, image: 0, audio: 0 };
+  for (const a of assets) counts[a.type] = (counts[a.type] || 0) + 1;
+
+  const system = `You are a video editor AI for HyperFrames, an HTML-to-MP4 renderer. Your job is to choose a template and style based on the user's uploaded assets and description. Available templates:
+- simple-title: text only, no media
+- product-intro: best with one background video + title/subtitle + optional music
+- slideshow: best with multiple images + title/subtitle + optional music
+- social-clip: best for vertical 9:16 short videos with a background video
+
+Output ONLY a JSON object with these fields: template, title, subtitle, duration (seconds, integer, 1-120), width, height, fps (24/30/60), quality (draft/standard/high), bgColor (hex), textColor (hex). Do not include markdown or explanations. Ensure colors and dimensions fit the template (e.g., social-clip is 1080x1920, product-intro is 1920x1080).`;
+
+  const user = `User request: "${prompt || 'create a video'}"
+Available assets: ${counts.video} video(s), ${counts.image} image(s), ${counts.audio} audio file(s).
+Current defaults: ${JSON.stringify({ title: defaults.title, subtitle: defaults.subtitle, duration: defaults.duration, width: defaults.width, height: defaults.height, fps: defaults.fps, quality: defaults.quality, bgColor: defaults.bgColor, textColor: defaults.textColor })}.`;
+
+  return { system, user };
+}
+
+async function callAnthropic({ apiKey, model, system, user }) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: model || 'claude-3-5-sonnet-20241022',
+      max_tokens: 1024,
+      temperature: 0.2,
+      system,
+      messages: [{ role: 'user', content: user }]
+    })
+  });
+  if (!res.ok) throw new Error(`Anthropic API error ${res.status}: ${await res.text()}`);
+  const json = await res.json();
+  return json.content?.[0]?.text || '';
+}
+
+async function callOpenAI({ apiKey, model, system, user }) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: model || 'gpt-4o',
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ]
+    })
+  });
+  if (!res.ok) throw new Error(`OpenAI API error ${res.status}: ${await res.text()}`);
+  const json = await res.json();
+  return json.choices?.[0]?.message?.content || '';
+}
+
+async function generateScenePlan({ ai, assets, defaults }) {
+  const provider = ai.provider || 'anthropic';
+  const model = ai.model;
+  const apiKey = ai.apiKey || (provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY);
+  if (!apiKey) throw new Error('No API key provided for AI generation');
+
+  const { system, user } = buildPlanPrompt({ prompt: ai.prompt || defaults.prompt, assets, defaults });
+
+  const raw = provider === 'openai'
+    ? await callOpenAI({ apiKey, model, system, user })
+    : await callAnthropic({ apiKey, model, system, user });
+
+  const plan = parseJSON(raw);
+  return sanitizePlan(plan, defaults);
+}
+
+function buildComposition({ title, subtitle, duration, width, height, bgColor, textColor, template, assets }) {
   const safeTitle = escapeHtml(title || 'ATL Video Editor');
   const safeSubtitle = escapeHtml(subtitle || 'Powered by HyperFrames');
   const videos = assets.filter(a => a.type === 'video');
   const images = assets.filter(a => a.type === 'image');
   const audios = assets.filter(a => a.type === 'audio');
 
-  if (template === 'simple-title') {
-    return buildSimpleTitle({ safeTitle, safeSubtitle, duration, width, height, bgColor, textColor });
-  }
-  if (template === 'slideshow') {
-    return buildSlideshow({ safeTitle, safeSubtitle, duration, width, height, bgColor, textColor, images, audios });
-  }
-  if (template === 'social-clip') {
-    return buildSocialClip({ safeTitle, safeSubtitle, duration, width, height, bgColor, textColor, videos, audios });
-  }
+  if (template === 'simple-title') return buildSimpleTitle({ safeTitle, safeSubtitle, duration, width, height, bgColor, textColor });
+  if (template === 'slideshow') return buildSlideshow({ safeTitle, safeSubtitle, duration, width, height, bgColor, textColor, images, audios });
+  if (template === 'social-clip') return buildSocialClip({ safeTitle, safeSubtitle, duration, width, height, bgColor, textColor, videos, audios });
   return buildProductIntro({ safeTitle, safeSubtitle, duration, width, height, bgColor, textColor, videos, audios });
 }
 
@@ -99,18 +204,6 @@ function rootOpen({ width, height, bgColor, duration }) {
        style="width:${width}px;height:${height}px;background:${bgColor};position:relative;overflow:hidden;">`;
 }
 
-function rootClose({ duration }) {
-  return `  </div>
-  <script>
-    window.__timelines = window.__timelines || {};
-    window.__timelines["root"] = window.__timelines["root"] || gsap.timeline({ paused: true });
-    const rootTl = window.__timelines["root"];
-    rootTl.set({}, {}, ${duration});
-  <\/script>
-</body>
-</html>`;
-}
-
 function textOverlay({ id, text, start, duration, width, height, textColor, fontSize, y, track }) {
   const yPos = y ?? (height * 0.45);
   return `    <h1 id="${id}" class="clip"
@@ -123,8 +216,8 @@ function textOverlay({ id, text, start, duration, width, height, textColor, font
 function buildSimpleTitle({ safeTitle, safeSubtitle, duration, width, height, bgColor, textColor }) {
   let html = pageHead();
   html += rootOpen({ width, height, bgColor, duration });
-  html += textOverlay({ id: 'title', text: safeTitle, start: 0, duration, width, height, textColor, fontSize: 120, y: height * 0.4, track: 0 });
-  html += textOverlay({ id: 'subtitle', text: safeSubtitle, start: 0.6, duration: Math.max(0, duration - 0.6), width, height, textColor, fontSize: 48, y: height * 0.55, track: 1 });
+  html += textOverlay({ id: 'title', text: safeTitle, start: 0, duration, width, height, textColor, fontSize: Math.min(120, width / 10), y: height * 0.4, track: 0 });
+  html += textOverlay({ id: 'subtitle', text: safeSubtitle, start: 0.6, duration: Math.max(0, duration - 0.6), width, height, textColor, fontSize: Math.min(48, width / 25), y: height * 0.55, track: 1 });
   html += `  <script>
     const tl = gsap.timeline({ paused: true });
     tl.from("#title", { opacity: 0, y: -60, scale: 0.9, duration: 1 }, 0);
@@ -147,8 +240,8 @@ function buildProductIntro({ safeTitle, safeSubtitle, duration, width, height, b
       style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;" data-volume="0.4"><\/video>`;
   }
 
-  html += textOverlay({ id: 'title', text: safeTitle, start: 0.3, duration: Math.max(0, duration - 0.6), width, height, textColor, fontSize: width > height ? 120 : 140, y: height * 0.38, track: 1 });
-  html += textOverlay({ id: 'subtitle', text: safeSubtitle, start: 0.9, duration: Math.max(0, duration - 1.2), width, height, textColor, fontSize: width > height ? 48 : 54, y: height * 0.54, track: 2 });
+  html += textOverlay({ id: 'title', text: safeTitle, start: 0.3, duration: Math.max(0, duration - 0.6), width, height, textColor, fontSize: Math.min(width > height ? 120 : 140, width / 10), y: height * 0.38, track: 1 });
+  html += textOverlay({ id: 'subtitle', text: safeSubtitle, start: 0.9, duration: Math.max(0, duration - 1.2), width, height, textColor, fontSize: Math.min(width > height ? 48 : 54, width / 22), y: height * 0.54, track: 2 });
 
   if (audios[0]) {
     html += `    <audio src="assets/${audios[0].filename}" data-start="0" data-track-index="99" data-volume="0.6"><\/audio>`;
@@ -176,8 +269,8 @@ function buildSocialClip({ safeTitle, safeSubtitle, duration, width, height, bgC
       style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;" data-volume="0.6"><\/video>`;
   }
 
-  html += textOverlay({ id: 'title', text: safeTitle, start: 0.2, duration: Math.max(0, duration - 0.4), width, height, textColor, fontSize: width > height ? 96 : 130, y: height * 0.35, track: 1 });
-  html += textOverlay({ id: 'subtitle', text: safeSubtitle, start: 0.6, duration: Math.max(0, duration - 0.8), width, height, textColor, fontSize: width > height ? 40 : 52, y: height * 0.55, track: 2 });
+  html += textOverlay({ id: 'title', text: safeTitle, start: 0.2, duration: Math.max(0, duration - 0.4), width, height, textColor, fontSize: Math.min(width > height ? 96 : 130, width / 8), y: height * 0.35, track: 1 });
+  html += textOverlay({ id: 'subtitle', text: safeSubtitle, start: 0.6, duration: Math.max(0, duration - 0.8), width, height, textColor, fontSize: Math.min(width > height ? 40 : 52, width / 16), y: height * 0.55, track: 2 });
 
   if (audios[0]) {
     html += `    <audio src="assets/${audios[0].filename}" data-start="0" data-track-index="99" data-volume="0.7"><\/audio>`;
@@ -212,8 +305,8 @@ function buildSlideshow({ safeTitle, safeSubtitle, duration, width, height, bgCo
   });
 
   const titleDuration = Math.min(duration, 2.5);
-  html += textOverlay({ id: 'title', text: safeTitle, start: 0, duration: titleDuration, width, height, textColor, fontSize: width > height ? 84 : 100, y: height * 0.08, track: 1 });
-  html += textOverlay({ id: 'subtitle', text: safeSubtitle, start: 0.5, duration: Math.max(0, titleDuration - 0.5), width, height, textColor, fontSize: width > height ? 36 : 44, y: height * 0.18, track: 2 });
+  html += textOverlay({ id: 'title', text: safeTitle, start: 0, duration: titleDuration, width, height, textColor, fontSize: Math.min(width > height ? 84 : 100, width / 12), y: height * 0.08, track: 1 });
+  html += textOverlay({ id: 'subtitle', text: safeSubtitle, start: 0.5, duration: Math.max(0, titleDuration - 0.5), width, height, textColor, fontSize: Math.min(width > height ? 36 : 44, width / 24), y: height * 0.18, track: 2 });
 
   if (audios[0]) {
     html += `    <audio src="assets/${audios[0].filename}" data-start="0" data-track-index="99" data-volume="0.5"><\/audio>`;
@@ -258,43 +351,71 @@ app.get('/api/uploads/:filename', async (req, res) => {
 });
 
 app.post('/api/render', async (req, res) => {
-  const {
-    title = 'ATL Video Editor',
-    subtitle = 'Powered by HyperFrames',
-    duration = 5,
-    width = 1920,
-    height = 1080,
-    fps = 30,
-    quality = 'standard',
-    bgColor = '#0f172a',
-    textColor = '#ffffff',
-    template = 'auto',
-    prompt = '',
-    assets = []
-  } = req.body;
+  const payload = {
+    title: 'ATL Video Editor',
+    subtitle: 'Powered by HyperFrames',
+    duration: 5,
+    width: 1920,
+    height: 1080,
+    fps: 30,
+    quality: 'standard',
+    bgColor: '#0f172a',
+    textColor: '#ffffff',
+    template: 'auto',
+    prompt: '',
+    assets: [],
+    ...req.body
+  };
 
-  let dur = Math.max(1, Math.min(120, Number(duration) || 5));
-  const w = Number(width) || 1920;
-  const h = Number(height) || 1080;
-  const f = Number(fps) || 30;
+  payload.duration = clamp(Math.round(Number(payload.duration) || 5), 1, 120);
+  payload.width = clamp(Math.round(Number(payload.width) || 1920), 64, 3840);
+  payload.height = clamp(Math.round(Number(payload.height) || 1080), 64, 3840);
+  payload.fps = VALID_FPS.includes(Number(payload.fps)) ? Number(payload.fps) : 30;
+  payload.quality = VALID_QUALITY.includes(payload.quality) ? payload.quality : 'standard';
 
-  const selectedTemplate = resolveTemplate(template, prompt, assets);
+  // AI scene plan generation
+  let plan = null;
+  const ai = req.body.ai;
+  if (ai?.enabled) {
+    try {
+      plan = await generateScenePlan({ ai, assets: payload.assets, defaults: payload });
+      console.log('AI plan:', plan);
+    } catch (err) {
+      console.error('AI plan failed:', err);
+      return res.status(500).json({ error: 'AI scene generation failed', detail: err.message });
+    }
+  }
+
+  const selectedTemplate = plan?.template || resolveTemplate(payload.template, payload.prompt, payload.assets);
 
   // Adjust duration for slideshows so each slide gets at least 1.5s
-  const images = assets.filter(a => a.type === 'image');
+  const images = payload.assets.filter(a => a.type === 'image');
   if (selectedTemplate === 'slideshow' && images.length > 0) {
-    dur = Math.max(dur, images.length * 1.5);
+    payload.duration = Math.max(payload.duration, images.length * 1.5);
   }
+
+  const final = {
+    ...payload,
+    title: plan?.title ?? payload.title,
+    subtitle: plan?.subtitle ?? payload.subtitle,
+    duration: plan?.duration ?? payload.duration,
+    width: plan?.width ?? payload.width,
+    height: plan?.height ?? payload.height,
+    fps: plan?.fps ?? payload.fps,
+    quality: plan?.quality ?? payload.quality,
+    bgColor: plan?.bgColor ?? payload.bgColor,
+    textColor: plan?.textColor ?? payload.textColor,
+    template: selectedTemplate
+  };
 
   const jobId = randomUUID();
   const projectDir = path.join(PROJECTS_DIR, jobId);
   await fs.mkdir(projectDir, { recursive: true });
 
-  // Copy uploaded assets into the project
-  if (assets.length) {
+  if (final.assets.length) {
     const assetsDir = path.join(projectDir, 'assets');
     await fs.mkdir(assetsDir, { recursive: true });
-    for (const asset of assets) {
+    for (const asset of final.assets) {
       const src = path.join(UPLOADS_DIR, path.basename(asset.filename || asset.id));
       const dst = path.join(assetsDir, path.basename(asset.filename || asset.id));
       try {
@@ -306,16 +427,13 @@ app.post('/api/render', async (req, res) => {
     }
   }
 
-  const html = buildComposition({
-    title, subtitle, duration: dur, width: w, height: h, fps: f,
-    bgColor, textColor, template: selectedTemplate, prompt, assets
-  });
+  const html = buildComposition(final);
   await fs.writeFile(path.join(projectDir, 'index.html'), html, 'utf-8');
 
   const outputName = 'output.mp4';
   const outputPath = path.join(projectDir, outputName);
 
-  const args = ['render', '-o', outputName, '-f', String(f), '-q', quality];
+  const args = ['render', '-o', outputName, '-f', String(final.fps), '-q', final.quality];
   const child = spawn('node', [CLI, ...args], { cwd: projectDir, stdio: ['ignore', 'pipe', 'pipe'] });
 
   let stdout = '';
@@ -343,12 +461,13 @@ app.post('/api/render', async (req, res) => {
           jobId,
           outputUrl: `/api/outputs/${jobId}/${outputName}`,
           size: stats.size,
-          duration: dur,
-          width: w,
-          height: h,
-          fps: f,
-          quality,
-          template: selectedTemplate
+          duration: final.duration,
+          width: final.width,
+          height: final.height,
+          fps: final.fps,
+          quality: final.quality,
+          template: selectedTemplate,
+          plan
         });
       }
     } else {
@@ -363,6 +482,9 @@ app.get('/api/outputs/:jobId/:fileName', async (req, res) => {
   if (!filePath.startsWith(path.join(PROJECTS_DIR))) return res.status(400).send('Invalid path');
   try {
     await fs.access(filePath);
+    if (req.query.download === '1') {
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    }
     res.setHeader('Content-Type', 'video/mp4');
     res.sendFile(path.resolve(filePath));
   } catch {
