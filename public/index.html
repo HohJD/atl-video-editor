@@ -10,10 +10,36 @@
   <div class="app">
     <header>
       <h1>ATL Video Editor</h1>
-      <p>Auto-generate MP4 videos with HyperFrames</p>
+      <p>Upload footage, pick a template, describe it — HyperFrames does the rest</p>
     </header>
     <main>
       <form id="editor" class="editor">
+        <label>
+          Template
+          <select id="template">
+            <option value="auto" selected>Auto (infer from prompt)</option>
+            <option value="simple-title">Title card</option>
+            <option value="product-intro">Product intro</option>
+            <option value="slideshow">Slideshow</option>
+            <option value="social-clip">Social clip / Reels</option>
+          </select>
+        </label>
+
+        <label>
+          Describe your video (prompt)
+          <textarea id="prompt" rows="3" placeholder="E.g., a 15s product intro with upbeat music, or a slideshow of my vacation photos"></textarea>
+        </label>
+
+        <label>
+          Upload footage
+          <input type="file" id="fileInput" multiple accept="video/*,image/*,audio/*">
+        </label>
+        <div id="uploadArea" class="upload-area">
+          <p>Drag & drop videos, images, or audio here</p>
+          <button type="button" id="browseBtn" class="secondary">Browse files</button>
+        </div>
+        <ul id="assetList" class="asset-list"></ul>
+
         <label>
           Title
           <input type="text" id="title" value="Hello ATL" maxlength="60">
@@ -25,7 +51,7 @@
         <div class="row">
           <label>
             Duration (s)
-            <input type="number" id="duration" value="5" min="1" max="60" step="1">
+            <input type="number" id="duration" value="5" min="1" max="120" step="1">
           </label>
           <label>
             FPS
