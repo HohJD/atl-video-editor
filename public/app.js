@@ -1,11 +1,11 @@
-const form = document.getElementById('editor');
-const statusEl = document.getElementById('status');
-const videoEl = document.getElementById('outputVideo');
-const renderBtn = document.getElementById('renderBtn');
 const fileInput = document.getElementById('fileInput');
 const uploadArea = document.getElementById('uploadArea');
-const browseBtn = document.getElementById('browseBtn');
-const assetList = document.getElementById('assetList');
+const mediaList = document.getElementById('mediaList');
+const generateBtn = document.getElementById('generateBtn');
+const exportBtn = document.getElementById('exportBtn');
+const outputVideo = document.getElementById('outputVideo');
+const previewPlaceholder = document.getElementById('previewPlaceholder');
+const generating = document.getElementById('generating');
 const aiEnabled = document.getElementById('aiEnabled');
 const aiSettings = document.getElementById('aiSettings');
 const aiProvider = document.getElementById('aiProvider');
@@ -13,12 +13,14 @@ const aiModel = document.getElementById('aiModel');
 const aiApiKey = document.getElementById('aiApiKey');
 const toggleKey = document.getElementById('toggleKey');
 const promptEl = document.getElementById('prompt');
-const templateEl = document.getElementById('template');
-const downloadBtn = document.getElementById('downloadBtn');
-const planBox = document.getElementById('planBox');
-const aspectRatio = document.getElementById('aspectRatio');
+const templateCards = document.querySelectorAll('.template-card');
+const aspectPicker = document.getElementById('aspectPicker');
+const playhead = document.getElementById('playhead');
+const timelineDuration = document.getElementById('timelineDuration');
 
 let assets = [];
+let selectedTemplate = 'auto';
+let currentOutput = null;
 
 const MODELS = {
   anthropic: [
@@ -44,29 +46,17 @@ function populateModels() {
   });
 }
 
-function setStatus(text, type = 'info') {
-  statusEl.textContent = text;
-  statusEl.className = `status ${type}`;
-  statusEl.classList.remove('hidden');
+function showGenerating(show) {
+  generating.classList.toggle('hidden', !show);
+  generateBtn.disabled = show;
 }
 
-function renderAssetItem(asset, index) {
-  const li = document.createElement('li');
-  li.innerHTML = `
-    <span class="asset-type">${asset.type}</span>
-    <span class="asset-name">${escapeHtml(asset.name)}</span>
-    <button type="button" class="remove" data-index="${index}">Remove</button>
-  `;
-  li.querySelector('button.remove').addEventListener('click', () => {
-    assets.splice(index, 1);
-    renderAssetList();
-  });
-  return li;
-}
-
-function renderAssetList() {
-  assetList.innerHTML = '';
-  assets.forEach((asset, i) => assetList.appendChild(renderAssetItem(asset, i)));
+function setOutput(url) {
+  currentOutput = url;
+  outputVideo.src = url;
+  outputVideo.classList.remove('hidden');
+  previewPlaceholder.classList.add('hidden');
+  exportBtn.disabled = !url;
 }
 
 function escapeHtml(str) {
@@ -75,41 +65,99 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+function getStyleValues() {
+  return {
+    title: document.getElementById('title').value,
+    subtitle: document.getElementById('subtitle').value,
+    duration: Number(document.getElementById('duration').value),
+    width: Number(document.getElementById('width').value),
+    height: Number(document.getElementById('height').value),
+    fps: Number(document.getElementById('fps').value),
+    quality: document.getElementById('quality').value,
+    bgColor: document.getElementById('bgColor').value,
+    textColor: document.getElementById('textColor').value
+  };
+}
+
+function updatePreviewAspect(w, h) {
+  const wrap = document.getElementById('previewWrap');
+  wrap.style.aspectRatio = `${w} / ${h}`;
+}
+
+function renderMedia() {
+  mediaList.innerHTML = '';
+  assets.forEach((asset, i) => {
+    const el = document.createElement('div');
+    el.className = 'media-item';
+    el.setAttribute('data-type', asset.type);
+
+    let thumb = `<div class="thumb" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:0.7rem;">${asset.type}</div>`;
+    if (asset.type === 'image') {
+      thumb = `<img class="thumb" src="${asset.url}" alt="">`;
+    } else if (asset.type === 'video') {
+      thumb = `<video class="thumb" src="${asset.url}" muted></video>`;
+    }
+
+    el.innerHTML = `
+      <span class="tag">${asset.type}</span>
+      <button class="remove" data-index="${i}">X</button>
+      ${thumb}
+      <div class="name">${escapeHtml(asset.name)}</div>
+    `;
+    el.querySelector('button.remove').addEventListener('click', () => {
+      assets.splice(i, 1);
+      renderMedia();
+      renderTimeline();
+    });
+    mediaList.appendChild(el);
+  });
+}
+
 async function uploadFiles(files) {
   if (!files.length) return;
-  setStatus('Uploading…', 'info');
   const formData = new FormData();
-  for (const file of files) formData.append('files', file);
+  for (const f of files) formData.append('files', f);
   try {
     const res = await fetch('/api/upload', { method: 'POST', body: formData });
     if (!res.ok) throw new Error('Upload failed');
     const { assets: uploaded } = await res.json();
     assets = assets.concat(uploaded);
-    renderAssetList();
-    setStatus(`${assets.length} asset(s) ready`, 'success');
+    renderMedia();
+    renderTimeline();
   } catch (err) {
-    setStatus(err.message, 'error');
+    alert(err.message);
   }
 }
 
-browseBtn.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', (e) => uploadFiles(e.target.files));
-
-uploadArea.addEventListener('click', (e) => { if (e.target === uploadArea || e.target.closest('svg') || e.target.tagName === 'P') fileInput.click(); });
-uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+uploadArea.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => uploadFiles(e.target.files));
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
 uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
-uploadArea.addEventListener('drop', (e) => {
+uploadArea.addEventListener('drop', e => {
   e.preventDefault();
   uploadArea.classList.remove('dragover');
   uploadFiles(e.dataTransfer.files);
 });
 
-aiEnabled.addEventListener('change', () => {
-  aiSettings.classList.toggle('hidden', !aiEnabled.checked);
-  templateEl.disabled = aiEnabled.checked;
-  templateEl.closest('label').style.opacity = aiEnabled.checked ? '0.5' : '1';
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab + 'Tab').classList.add('active');
+  });
 });
 
+templateCards.forEach(card => {
+  card.addEventListener('click', () => {
+    templateCards.forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    selectedTemplate = card.dataset.template;
+    renderTimeline();
+  });
+});
+
+aiEnabled.addEventListener('change', () => aiSettings.classList.toggle('hidden', !aiEnabled.checked));
 aiProvider.addEventListener('change', populateModels);
 
 toggleKey.addEventListener('click', () => {
@@ -118,28 +166,84 @@ toggleKey.addEventListener('click', () => {
   toggleKey.textContent = isPassword ? 'Hide' : 'Show';
 });
 
-aspectRatio.addEventListener('click', (e) => {
+aspectPicker.addEventListener('click', e => {
   const btn = e.target.closest('button');
   if (!btn) return;
-  [...aspectRatio.children].forEach(b => b.classList.remove('active'));
+  aspectPicker.querySelectorAll('button').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('width').value = btn.dataset.w;
   document.getElementById('height').value = btn.dataset.h;
+  updatePreviewAspect(btn.dataset.w, btn.dataset.h);
 });
 
-function getPayload() {
-  return {
-    template: templateEl.value,
+['width', 'height'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    const w = document.getElementById('width').value;
+    const h = document.getElementById('height').value;
+    updatePreviewAspect(w, h);
+    aspectPicker.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  });
+});
+
+function renderTimeline() {
+  const duration = Number(document.getElementById('duration').value) || 5;
+  timelineDuration.textContent = duration.toFixed(1) + 's';
+
+  const textLane = document.getElementById('textLane');
+  const videoLane = document.getElementById('videoLane');
+  const audioLane = document.getElementById('audioLane');
+  textLane.innerHTML = '';
+  videoLane.innerHTML = '';
+  audioLane.innerHTML = '';
+
+  const template = selectedTemplate;
+  const videos = assets.filter(a => a.type === 'video');
+  const images = assets.filter(a => a.type === 'image');
+  const audios = assets.filter(a => a.type === 'audio');
+
+  const makeClip = (lane, cls, start, dur, label) => {
+    const left = (start / duration) * 100;
+    const width = (dur / duration) * 100;
+    const el = document.createElement('div');
+    el.className = `clip ${cls}`;
+    el.style.left = left + '%';
+    el.style.width = width + '%';
+    el.textContent = label;
+    lane.appendChild(el);
+  };
+
+  // Text overlay spans full duration
+  makeClip(textLane, 'text', 0, duration, getStyleValues().title);
+
+  if (template === 'slideshow' && images.length) {
+    const per = duration / images.length;
+    images.forEach((img, i) => makeClip(videoLane, 'image', i * per, per, img.name));
+  } else if (videos.length) {
+    makeClip(videoLane, 'video', 0, duration, videos[0].name);
+  }
+
+  if (audios.length) {
+    makeClip(audioLane, 'audio', 0, duration, audios[0].name);
+  }
+}
+
+['title', 'subtitle', 'duration', 'width', 'height', 'fps', 'quality', 'bgColor', 'textColor'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderTimeline);
+});
+
+async function generate() {
+  if (aiEnabled.checked && !aiApiKey.value.trim()) {
+    alert('Please enter an API key to use AI generation.');
+    return;
+  }
+
+  showGenerating(true);
+  const style = getStyleValues();
+
+  const payload = {
+    ...style,
+    template: selectedTemplate,
     prompt: promptEl.value,
-    title: document.getElementById('title').value,
-    subtitle: document.getElementById('subtitle').value,
-    duration: Number(document.getElementById('duration').value),
-    fps: Number(document.getElementById('fps').value),
-    quality: document.getElementById('quality').value,
-    width: Number(document.getElementById('width').value),
-    height: Number(document.getElementById('height').value),
-    bgColor: document.getElementById('bgColor').value,
-    textColor: document.getElementById('textColor').value,
     assets,
     ai: aiEnabled.checked ? {
       enabled: true,
@@ -149,25 +253,6 @@ function getPayload() {
       prompt: promptEl.value
     } : { enabled: false }
   };
-}
-
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  renderBtn.disabled = true;
-  renderBtn.textContent = 'Rendering…';
-  videoEl.classList.add('hidden');
-  downloadBtn.classList.add('hidden');
-  planBox.classList.add('hidden');
-  setStatus('Generating composition and rendering…', 'info');
-
-  const payload = getPayload();
-
-  if (payload.ai.enabled && !payload.ai.apiKey) {
-    setStatus('Please enter an API key to use AI generation.', 'error');
-    renderBtn.disabled = false;
-    renderBtn.textContent = 'Render Video';
-    return;
-  }
 
   try {
     const res = await fetch('/api/render', {
@@ -182,24 +267,38 @@ form.addEventListener('submit', async (e) => {
     }
 
     const data = await res.json();
-    videoEl.src = data.outputUrl;
-    videoEl.classList.remove('hidden');
-    downloadBtn.href = data.outputUrl + '?download=1';
-    downloadBtn.classList.remove('hidden');
-
-    let msg = `Done — ${Math.round(data.size / 1024)} KB · template: ${data.template}`;
+    setOutput(data.outputUrl);
     if (data.plan) {
-      msg += ` · AI chose ${data.plan.width}x${data.plan.height}`;
-      planBox.textContent = 'AI plan:\n' + JSON.stringify(data.plan, null, 2);
-      planBox.classList.remove('hidden');
+      document.getElementById('width').value = data.plan.width;
+      document.getElementById('height').value = data.plan.height;
+      document.getElementById('duration').value = data.plan.duration;
+      updatePreviewAspect(data.plan.width, data.plan.height);
     }
-    setStatus(msg, 'success');
+    renderTimeline();
   } catch (err) {
-    setStatus(err.message, 'error');
+    alert(err.message);
   } finally {
-    renderBtn.disabled = false;
-    renderBtn.textContent = 'Render Video';
+    showGenerating(false);
+  }
+}
+
+generateBtn.addEventListener('click', generate);
+
+exportBtn.addEventListener('click', () => {
+  if (!currentOutput) return;
+  const a = document.createElement('a');
+  a.href = currentOutput + '?download=1';
+  a.download = 'atl-video.mp4';
+  a.click();
+});
+
+outputVideo.addEventListener('timeupdate', () => {
+  if (outputVideo.duration) {
+    const pct = (outputVideo.currentTime / outputVideo.duration) * 100;
+    playhead.style.left = pct + '%';
   }
 });
 
 populateModels();
+updatePreviewAspect(1920, 1080);
+renderTimeline();

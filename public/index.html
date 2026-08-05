@@ -8,148 +8,152 @@
 </head>
 <body>
   <div class="app">
-    <header>
-      <h1>ATL Video Editor</h1>
-      <p>Upload footage, describe your idea, and auto-render MP4 videos with HyperFrames</p>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">ATL</span>
+        <span>Video Editor</span>
+      </div>
+      <div class="actions">
+        <button id="generateBtn" class="primary" type="button">Generate</button>
+        <button id="exportBtn" type="button">Export MP4</button>
+      </div>
     </header>
-    <main>
-      <form id="editor" class="editor">
-        <section class="panel">
-          <h2>Media</h2>
-          <input type="file" id="fileInput" multiple accept="video/*,image/*,audio/*">
-          <div id="uploadArea" class="upload-area">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <p>Drag &amp; drop videos, images, or audio here</p>
-            <button type="button" id="browseBtn" class="secondary">Browse files</button>
-          </div>
-          <ul id="assetList" class="asset-list"></ul>
-        </section>
 
-        <section class="panel">
-          <h2>AI Director</h2>
+    <div class="workspace">
+      <aside class="sidebar left">
+        <nav class="tabs">
+          <button class="tab-btn active" data-tab="media">Media</button>
+          <button class="tab-btn" data-tab="templates">Templates</button>
+        </nav>
+
+        <div id="mediaTab" class="tab-panel active">
+          <div id="uploadArea" class="upload-area">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p>Import media</p>
+            <small>Drag videos, images, audio</small>
+          </div>
+          <input type="file" id="fileInput" multiple accept="video/*,image/*,audio/*">
+          <div id="mediaList" class="media-list"></div>
+        </div>
+
+        <div id="templatesTab" class="tab-panel">
+          <div class="template-grid">
+            <button class="template-card active" data-template="auto">
+              <strong>Auto</strong>
+              <span>Pick best template from prompt</span>
+            </button>
+            <button class="template-card" data-template="simple-title">
+              <strong>Title</strong>
+              <span>Text-only title card</span>
+            </button>
+            <button class="template-card" data-template="product-intro">
+              <strong>Intro</strong>
+              <span>Video background + text</span>
+            </button>
+            <button class="template-card" data-template="slideshow">
+              <strong>Slideshow</strong>
+              <span>Image sequence + music</span>
+            </button>
+            <button class="template-card" data-template="social-clip">
+              <strong>Social</strong>
+              <span>Vertical short video</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <section class="stage">
+        <div class="preview-wrap" id="previewWrap">
+          <video id="outputVideo" controls class="hidden"></video>
+          <div id="previewPlaceholder" class="placeholder">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.5-3.5-5 5L8 12l-6 6"/></svg>
+            <p>Import media and click <b>Generate</b></p>
+          </div>
+          <div id="generating" class="generating hidden">Generating…</div>
+        </div>
+      </section>
+
+      <aside class="sidebar right">
+        <div class="panel">
+          <h3>AI Director</h3>
           <label class="toggle">
             <input type="checkbox" id="aiEnabled">
-            <span>Enable AI to generate the scene from my prompt</span>
+            <span>Enable AI</span>
           </label>
-
-          <div id="aiSettings" class="ai-settings hidden">
-            <div class="row">
-              <label>
-                Provider
-                <select id="aiProvider">
-                  <option value="anthropic" selected>Anthropic Claude</option>
-                  <option value="openai">OpenAI</option>
-                </select>
-              </label>
-              <label>
-                Model
-                <select id="aiModel"></select>
-              </label>
-            </div>
-
+          <div id="aiSettings" class="ai-fields hidden">
             <label>
+              Provider
+              <select id="aiProvider">
+                <option value="anthropic" selected>Anthropic Claude</option>
+                <option value="openai">OpenAI</option>
+              </select>
+            </label>
+            <label>
+              Model
+              <select id="aiModel"></select>
+            </label>
+            <label class="password">
               API key
-              <div class="password-wrap">
-                <input type="password" id="aiApiKey" placeholder="sk-... or sk-ant-...">
-                <button type="button" id="toggleKey" class="icon">Show</button>
-              </div>
-              <small>Your key is only used for this render and is not stored on the server.</small>
+              <input type="password" id="aiApiKey" placeholder="sk-... or sk-ant-...">
+              <button type="button" id="toggleKey">Show</button>
             </label>
+            <small>Key is only used for this render.</small>
           </div>
-
           <label>
-            Describe your video
-            <textarea id="prompt" rows="4" placeholder="E.g., a 15s product intro with my video as background, bold white text on a dark blue gradient, 1920x1080"></textarea>
+            Prompt / description
+            <textarea id="prompt" rows="4" placeholder="E.g., a 15s product intro with upbeat music, bold white title"></textarea>
           </label>
-        </section>
+        </div>
 
-        <section class="panel">
-          <h2>Style & Output</h2>
-          <label>
-            Template override (used when AI is off)
-            <select id="template">
-              <option value="auto" selected>Auto (infer from prompt)</option>
-              <option value="simple-title">Title card</option>
-              <option value="product-intro">Product intro</option>
-              <option value="slideshow">Slideshow</option>
-              <option value="social-clip">Social clip / Reels</option>
-            </select>
-          </label>
-
+        <div class="panel">
+          <h3>Style</h3>
           <div class="row">
-            <label>
-              Title
-              <input type="text" id="title" value="Hello ATL" maxlength="60">
-            </label>
-            <label>
-              Subtitle
-              <input type="text" id="subtitle" value="Powered by HyperFrames" maxlength="120">
-            </label>
+            <label>Title <input type="text" id="title" value="Hello ATL" maxlength="60"></label>
+            <label>Subtitle <input type="text" id="subtitle" value="Powered by HyperFrames" maxlength="120"></label>
           </div>
-
-          <div class="row">
-            <label>
-              Duration (s)
-              <input type="number" id="duration" value="5" min="1" max="120" step="1">
-            </label>
-            <label>
-              FPS
-              <select id="fps">
-                <option value="24">24</option>
-                <option value="30" selected>30</option>
-                <option value="60">60</option>
-              </select>
-            </label>
-            <label>
-              Quality
-              <select id="quality">
-                <option value="draft">Draft</option>
-                <option value="standard" selected>Standard</option>
-                <option value="high">High</option>
-              </select>
-            </label>
+          <div class="row three">
+            <label>Duration (s) <input type="number" id="duration" value="5" min="1" max="120" step="1"></label>
+            <label>FPS <select id="fps"><option value="24">24</option><option value="30" selected>30</option><option value="60">60</option></select></label>
+            <label>Quality <select id="quality"><option value="draft">Draft</option><option value="standard" selected>Standard</option><option value="high">High</option></select></label>
           </div>
-
-          <label>Aspect ratio preset</label>
-          <div class="segmented" id="aspectRatio">
-            <button type="button" data-w="1920" data-h="1080" class="active">Landscape 16:9</button>
-            <button type="button" data-w="1080" data-h="1920">Portrait 9:16</button>
-            <button type="button" data-w="1080" data-h="1080">Square 1:1</button>
+          <label>Aspect ratio</label>
+          <div class="aspect-picker" id="aspectPicker">
+            <button type="button" data-w="1920" data-h="1080" class="active">16:9</button>
+            <button type="button" data-w="1080" data-h="1920">9:16</button>
+            <button type="button" data-w="1080" data-h="1080">1:1</button>
+            <button type="button" data-w="1280" data-h="720">16:9 HD</button>
           </div>
-
-          <div class="row">
-            <label>
-              Width
-              <input type="number" id="width" value="1920" step="10">
-            </label>
-            <label>
-              Height
-              <input type="number" id="height" value="1080" step="10">
-            </label>
+          <div class="row two">
+            <label>Width <input type="number" id="width" value="1920" step="10"></label>
+            <label>Height <input type="number" id="height" value="1080" step="10"></label>
           </div>
-
-          <div class="row">
-            <label>
-              Background
-              <input type="color" id="bgColor" value="#0f172a">
-            </label>
-            <label>
-              Text
-              <input type="color" id="textColor" value="#ffffff">
-            </label>
+          <div class="row two">
+            <label>Background <input type="color" id="bgColor" value="#0f172a"></label>
+            <label>Text <input type="color" id="textColor" value="#ffffff"></label>
           </div>
+        </div>
+      </aside>
+    </div>
 
-          <button type="submit" id="renderBtn">Render Video</button>
-        </section>
-      </form>
-
-      <section class="preview">
-        <div id="status" class="status hidden"></div>
-        <video id="outputVideo" controls class="hidden"></video>
-        <a id="downloadBtn" class="download hidden" href="#" download="atl-video.mp4">Download MP4</a>
-        <pre id="planBox" class="plan hidden"></pre>
-      </section>
-    </main>
+    <footer class="timeline">
+      <div class="timeline-header">
+        <span>Timeline</span>
+        <span id="timelineDuration">0.0s</span>
+      </div>
+      <div class="timeline-body">
+        <div class="track-labels">
+          <div>Text</div>
+          <div>Video</div>
+          <div>Audio</div>
+        </div>
+        <div class="track-lanes" id="trackLanes">
+          <div class="lane" id="textLane"></div>
+          <div class="lane" id="videoLane"></div>
+          <div class="lane" id="audioLane"></div>
+        </div>
+        <div class="playhead" id="playhead" style="left:0%"></div>
+      </div>
+    </footer>
   </div>
   <script src="app.js"></script>
 </body>
