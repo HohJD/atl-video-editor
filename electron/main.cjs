@@ -29,7 +29,10 @@ function findChrome() {
     candidates.push(
       path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe'),
       path.join(process.env.PROGRAMFILES || '', 'Google\\Chrome\\Application\\chrome.exe'),
-      path.join(process.env['PROGRAMFILES(X86)'] || '', 'Google\\Chrome\\Application\\chrome.exe')
+      path.join(process.env['PROGRAMFILES(X86)'] || '', 'Google\\Chrome\\Application\\chrome.exe'),
+      // Edge is Chromium-based and preinstalled on Windows 10/11 — works as a fallback
+      path.join(process.env.PROGRAMFILES || '', 'Microsoft\\Edge\\Application\\msedge.exe'),
+      path.join(process.env['PROGRAMFILES(X86)'] || '', 'Microsoft\\Edge\\Application\\msedge.exe')
     );
   } else {
     candidates.push('/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/chrome');
@@ -44,11 +47,23 @@ function findFfmpeg() {
   const envPath = process.env.FFMPEG_PATH;
   if (envPath && fs.existsSync(envPath)) return envPath;
   const names = process.platform === 'win32' ? ['ffmpeg.exe'] : ['ffmpeg'];
-  const paths = (process.env.PATH || '').split(path.delimiter);
+  // GUI-launched apps on macOS don't inherit the shell PATH, so also check
+  // common install locations (Homebrew, MacPorts, winget/choco, local installs).
+  const extraDirs = process.platform === 'win32' ? [
+    'C:\\ffmpeg\\bin',
+    path.join(process.env.LOCALAPPDATA || '', 'Microsoft\\WinGet\\Links'),
+    'C:\\ProgramData\\chocolatey\\bin'
+  ] : [
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    '/opt/local/bin',
+    path.join(process.env.HOME || '', 'bin')
+  ];
+  const paths = (process.env.PATH || '').split(path.delimiter).concat(extraDirs);
   for (const p of paths) {
     for (const name of names) {
       const full = path.join(p, name);
-      if (fs.existsSync(full)) return full;
+      if (p && fs.existsSync(full)) return full;
     }
   }
   return null;
@@ -86,7 +101,7 @@ async function startServer() {
 
   const ffmpeg = findFfmpeg();
   if (!ffmpeg) {
-    dialog.showErrorBox('Missing dependency', 'FFmpeg was not found. Please install FFmpeg and make sure it is in your PATH.\n\nUbuntu/Debian: sudo apt install ffmpeg\nmacOS: brew install ffmpeg\nWindows: https://ffmpeg.org/download.html');
+    dialog.showErrorBox('Missing dependency', 'FFmpeg was not found. Please install FFmpeg and make sure it is in your PATH.\n\nmacOS: brew install ffmpeg\nWindows: winget install ffmpeg  (then restart the app)\nUbuntu/Debian: sudo apt install ffmpeg');
     app.quit();
     return;
   }

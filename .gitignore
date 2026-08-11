@@ -1,6 +1,7 @@
 node_modules/
 projects/
 uploads/
+cache/
 *.log
 .env
 release-builds/

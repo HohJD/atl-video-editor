@@ -13,148 +13,133 @@
         <span class="logo">ATL</span>
         <span>Video Editor</span>
       </div>
+      <div class="proj-settings">
+        <select id="presetSelect" title="Format preset">
+          <option value="1920x1080">Landscape 16:9</option>
+          <option value="1080x1920">TikTok / Reels / Shorts</option>
+          <option value="1080x1080">Square 1:1</option>
+          <option value="1280x720">HD 720p</option>
+        </select>
+        <select id="fpsSelect" title="Frame rate">
+          <option value="24">24 fps</option>
+          <option value="30" selected>30 fps</option>
+          <option value="60">60 fps</option>
+        </select>
+        <input type="color" id="bgColor" value="#0b0c15" title="Background color">
+      </div>
       <div class="actions">
-        <button id="generateBtn" class="primary" type="button">Generate</button>
-        <button id="exportBtn" type="button">Export MP4</button>
+        <select id="exportQuality" title="Export quality">
+          <option value="draft">Draft</option>
+          <option value="standard" selected>Standard</option>
+          <option value="high">High</option>
+        </select>
+        <button id="exportBtn" class="primary" type="button">Export MP4</button>
       </div>
     </header>
 
     <div class="workspace">
       <aside class="sidebar left">
-        <nav class="tabs">
-          <button class="tab-btn active" data-tab="media">Media</button>
-          <button class="tab-btn" data-tab="templates">Templates</button>
-        </nav>
-
-        <div id="mediaTab" class="tab-panel active">
-          <div id="uploadArea" class="upload-area">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <p>Import media</p>
-            <small>Drag videos, images, audio</small>
-          </div>
-          <input type="file" id="fileInput" multiple accept="video/*,image/*,audio/*">
-          <div id="mediaList" class="media-list"></div>
+        <div class="panel-head">Media</div>
+        <div id="uploadArea" class="upload-area">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p>Import media</p>
+          <small>Videos, images, audio — analyzed on import</small>
         </div>
-
-        <div id="templatesTab" class="tab-panel">
-          <div class="template-grid">
-            <button class="template-card active" data-template="auto">
-              <strong>Auto</strong>
-              <span>Pick best template from prompt</span>
-            </button>
-            <button class="template-card" data-template="simple-title">
-              <strong>Title</strong>
-              <span>Text-only title card</span>
-            </button>
-            <button class="template-card" data-template="product-intro">
-              <strong>Intro</strong>
-              <span>Video background + text</span>
-            </button>
-            <button class="template-card" data-template="slideshow">
-              <strong>Slideshow</strong>
-              <span>Image sequence + music</span>
-            </button>
-            <button class="template-card" data-template="social-clip">
-              <strong>Social</strong>
-              <span>Vertical short video</span>
-            </button>
-          </div>
-        </div>
+        <input type="file" id="fileInput" multiple accept="video/*,image/*,audio/*">
+        <div id="mediaList" class="media-list"></div>
       </aside>
 
       <section class="stage">
-        <div class="preview-wrap" id="previewWrap">
-          <video id="outputVideo" controls class="hidden"></video>
-          <div id="previewPlaceholder" class="placeholder">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.5-3.5-5 5L8 12l-6 6"/></svg>
-            <p>Import media and click <b>Generate</b></p>
+        <div class="preview-shell">
+          <iframe id="previewFrame" src="preview.html"></iframe>
+          <div id="emptyHint" class="empty-hint">
+            <p>Import a clip, then add it to the timeline<br>— or just tell the agent what you want.</p>
           </div>
-          <div id="generating" class="generating hidden">Generating…</div>
+        </div>
+        <div class="transport">
+          <button id="playBtn" type="button" title="Play/Pause (Space)">▶</button>
+          <span id="timeDisplay" class="time">0:00.0 / 0:00.0</span>
         </div>
       </section>
 
       <aside class="sidebar right">
-        <div class="panel">
-          <h3>AI Director</h3>
-          <label class="toggle">
-            <input type="checkbox" id="aiEnabled">
-            <span>Enable AI</span>
-          </label>
-          <div id="aiSettings" class="ai-fields hidden">
-            <label>
-              Provider
-              <select id="aiProvider">
-                <option value="anthropic" selected>Anthropic Claude</option>
-                <option value="openai">OpenAI</option>
-              </select>
-            </label>
-            <label>
-              Model
-              <select id="aiModel"></select>
-            </label>
-            <label class="password">
-              API key
-              <input type="password" id="aiApiKey" placeholder="sk-... or sk-ant-...">
-              <button type="button" id="toggleKey">Show</button>
-            </label>
-            <small>Key is only used for this render.</small>
-          </div>
-          <label>
-            Prompt / description
-            <textarea id="prompt" rows="4" placeholder="E.g., a 15s product intro with upbeat music, bold white title"></textarea>
-          </label>
+        <div class="panel-head chat-head">
+          <span>Agent</span>
+          <span class="chat-head-actions">
+            <button id="keyBtn" class="ghost" type="button" title="API key & model">⚙</button>
+            <button id="chatResetBtn" class="ghost" type="button" title="Clear conversation">↺</button>
+          </span>
         </div>
-
-        <div class="panel">
-          <h3>Style</h3>
-          <div class="row">
-            <label>Title <input type="text" id="title" value="Hello ATL" maxlength="60"></label>
-            <label>Subtitle <input type="text" id="subtitle" value="Powered by HyperFrames" maxlength="120"></label>
-          </div>
-          <div class="row three">
-            <label>Duration (s) <input type="number" id="duration" value="5" min="1" max="120" step="1"></label>
-            <label>FPS <select id="fps"><option value="24">24</option><option value="30" selected>30</option><option value="60">60</option></select></label>
-            <label>Quality <select id="quality"><option value="draft">Draft</option><option value="standard" selected>Standard</option><option value="high">High</option></select></label>
-          </div>
-          <label>Aspect ratio</label>
-          <div class="aspect-picker" id="aspectPicker">
-            <button type="button" data-w="1920" data-h="1080" class="active">16:9</button>
-            <button type="button" data-w="1080" data-h="1920">9:16</button>
-            <button type="button" data-w="1080" data-h="1080">1:1</button>
-            <button type="button" data-w="1280" data-h="720">16:9 HD</button>
-          </div>
-          <div class="row two">
-            <label>Width <input type="number" id="width" value="1920" step="10"></label>
-            <label>Height <input type="number" id="height" value="1080" step="10"></label>
-          </div>
-          <div class="row two">
-            <label>Background <input type="color" id="bgColor" value="#0f172a"></label>
-            <label>Text <input type="color" id="textColor" value="#ffffff"></label>
-          </div>
+        <div id="keySettings" class="key-settings hidden">
+          <label>Model
+            <select id="aiModel">
+              <option value="claude-sonnet-5" selected>Claude Sonnet 5</option>
+              <option value="claude-opus-5">Claude Opus 5</option>
+              <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+            </select>
+          </label>
+          <label class="password">Anthropic API key
+            <input type="password" id="aiApiKey" placeholder="sk-ant-…">
+            <button type="button" id="toggleKey">Show</button>
+          </label>
+          <small>Stored only on this device.</small>
+        </div>
+        <div id="chatLog" class="chat-log">
+          <div class="chat-bubble assistant">I can edit the timeline for you. Try:<br>• “add my clip and cut it to the beat”<br>• “auto-caption it, karaoke style”<br>• “make it vertical for Reels”<br>• “slow-mo the first 3 seconds”</div>
+        </div>
+        <div class="chat-compose">
+          <textarea id="chatInput" rows="2" placeholder="Tell the agent what to do…"></textarea>
+          <button id="chatSend" class="primary" type="button">Send</button>
         </div>
       </aside>
     </div>
 
-    <footer class="timeline">
-      <div class="timeline-header">
-        <span>Timeline</span>
-        <span id="timelineDuration">0.0s</span>
+    <footer class="timeline-panel">
+      <div class="tl-toolbar">
+        <div class="tl-group">
+          <button id="undoBtn" type="button" title="Undo (⌘Z)">↩ Undo</button>
+          <button id="redoBtn" type="button" title="Redo (⇧⌘Z)">↪ Redo</button>
+        </div>
+        <div class="tl-group">
+          <button id="splitBtn" type="button" title="Split at playhead (S)">Split</button>
+          <button id="deleteBtn" type="button" title="Delete selected (⌫)">Delete</button>
+          <button id="rippleBtn" type="button" title="Ripple delete selected">Ripple</button>
+          <button id="cloneBtn" type="button" title="Clone selected">Clone</button>
+          <button id="muteBtn" type="button" title="Mute/unmute selected">Mute</button>
+        </div>
+        <div class="tl-group">
+          <span id="selInfo" class="sel-info"></span>
+        </div>
+        <div class="tl-group right">
+          <label class="zoom-label">Zoom <input type="range" id="zoomRange" min="10" max="220" value="60"></label>
+        </div>
       </div>
-      <div class="timeline-body">
-        <div class="track-labels">
-          <div>Text</div>
-          <div>Video</div>
-          <div>Audio</div>
+      <div class="tl-scroll" id="tlScroll">
+        <div class="tl-inner" id="tlInner">
+          <div class="tl-ruler" id="tlRuler"></div>
+          <div class="tl-tracks" id="tlTracks"></div>
+          <div class="tl-playhead" id="tlPlayhead"></div>
         </div>
-        <div class="track-lanes" id="trackLanes">
-          <div class="lane" id="textLane"></div>
-          <div class="lane" id="videoLane"></div>
-          <div class="lane" id="audioLane"></div>
-        </div>
-        <div class="playhead" id="playhead" style="left:0%"></div>
       </div>
     </footer>
   </div>
+
+  <div id="exportOverlay" class="overlay hidden">
+    <div class="gen-box">
+      <div class="gen-stage" id="genStage">Starting…</div>
+      <div class="progress"><div class="progress-fill" id="genBar"></div></div>
+      <div class="gen-meta">
+        <span id="genPct">0%</span>
+        <button id="cancelBtn" type="button">Cancel</button>
+      </div>
+      <video id="exportVideo" class="hidden" controls></video>
+      <div id="exportDone" class="export-done hidden">
+        <a id="downloadLink" class="btn-link" download="atl-video.mp4">Download MP4</a>
+        <button id="closeExport" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast"></div>
   <script src="app.js"></script>
 </body>
