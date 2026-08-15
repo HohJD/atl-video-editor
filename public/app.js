@@ -46,6 +46,12 @@ function fmt(t) {
   return `${m}:${s}`;
 }
 
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = String(str ?? '');
+  return div.innerHTML;
+}
+
 // --- API -------------------------------------------------------------------
 
 async function api(path, opts = {}) {
@@ -134,54 +140,89 @@ function scheduleAssetPoll() {
 
 const STAGE_LABELS = { metadata: 'probe', proxy: 'proxy', scenes: 'scenes', silence: 'audio map', waveform: 'waveform', beats: 'beats', transcript: 'transcript', done: 'done', cached: 'cached' };
 
+// Media items update in place so thumbnails don't reload/flicker on every
+// analysis-status poll.
+const mediaNodes = new Map(); // assetId -> { root, statusBox, actionsBox, sig }
+
+function buildMediaItem(asset) {
+  const root = document.createElement('div');
+  root.className = 'media-item';
+
+  let thumb;
+  if (asset.type === 'image') {
+    thumb = `<img class="thumb" src="${asset.url}" alt="">`;
+  } else if (asset.type === 'video') {
+    thumb = `<video class="thumb" src="${(asset.proxyUrl || asset.url)}#t=0.5" muted preload="metadata"></video>`;
+  } else {
+    thumb = `<div class="thumb audio-thumb">♪</div>`;
+  }
+
+  root.innerHTML = `
+    <button class="remove" title="Remove">×</button>
+    ${thumb}
+    <div class="name" title="${esc(asset.name)}">${esc(asset.name)}</div>
+    <div class="status-box"></div>
+    <div class="a-actions"></div>`;
+
+  root.querySelector('.remove').addEventListener('click', async () => {
+    await api(`/api/assets/${encodeURIComponent(asset.id)}`, { method: 'DELETE' });
+    state.assets = state.assets.filter(a => a.id !== asset.id);
+    renderMedia();
+    showToast('Asset removed', 'info');
+  });
+
+  return { root, statusBox: root.querySelector('.status-box'), actionsBox: root.querySelector('.a-actions'), sig: null };
+}
+
+function mediaSig(asset) {
+  return `${asset.status}|${asset.stages?.length || 0}|${asset.analysis ? 1 : 0}`;
+}
+
+function updateMediaItem(node, asset) {
+  const sig = mediaSig(asset);
+  if (node.sig === sig) return;
+  node.sig = sig;
+  node.root.className = 'media-item' + (asset.status === 'analyzing' ? ' analyzing' : '');
+
+  if (asset.status === 'analyzing') {
+    const last = asset.stages[asset.stages.length - 1];
+    node.statusBox.innerHTML = `<div class="a-status"><span class="spinner"></span> analyzing… ${esc(STAGE_LABELS[last] || 'starting')}</div>`;
+  } else if (asset.status === 'error') {
+    node.statusBox.innerHTML = `<div class="a-status error">analysis failed</div>`;
+  } else if (asset.analysis) {
+    const isImage = asset.type === 'image';
+    const bits = [];
+    if (!isImage && asset.analysis.meta.duration) bits.push(`${Math.round(asset.analysis.meta.duration * 10) / 10}s`);
+    for (const t of asset.analysis.tags || []) bits.push(t);
+    if (asset.analysis.bpm) bits.push(`${asset.analysis.bpm} bpm`);
+    if (asset.analysis.scenes?.length) bits.push(`${asset.analysis.scenes.length + 1} scenes`);
+    node.statusBox.innerHTML = `<div class="a-tags">${bits.map(b => `<span>${esc(b)}</span>`).join('')}</div>`;
+  }
+
+  node.actionsBox.innerHTML = `
+    <button class="add" ${asset.status !== 'ready' ? 'disabled' : ''}>+ Add</button>
+    ${asset.analysis?.highlight ? `<button class="best" title="Add just the suggested highlight ${asset.analysis.highlight.start}–${asset.analysis.highlight.end}s">★ Best</button>` : ''}`;
+  node.actionsBox.querySelector('.add').addEventListener('click', () => addAssetToTimeline(asset));
+  node.actionsBox.querySelector('.best')?.addEventListener('click', () => addAssetToTimeline(asset, asset.analysis.highlight));
+}
+
 function renderMedia() {
-  mediaList.textContent = '';
+  const seen = new Set();
   for (const asset of state.assets) {
-    const el = document.createElement('div');
-    el.className = 'media-item' + (asset.status === 'analyzing' ? ' analyzing' : '');
-
-    let thumb;
-    if (asset.type === 'image') {
-      thumb = `<img class="thumb" src="${asset.url}" alt="">`;
-    } else if (asset.type === 'video') {
-      thumb = `<video class="thumb" src="${(asset.proxyUrl || asset.url)}#t=0.5" muted preload="metadata"></video>`;
-    } else {
-      thumb = `<div class="thumb audio-thumb">♪</div>`;
+    seen.add(asset.id);
+    let node = mediaNodes.get(asset.id);
+    if (!node) {
+      node = buildMediaItem(asset);
+      mediaNodes.set(asset.id, node);
+      mediaList.appendChild(node.root);
     }
-
-    let status = '';
-    if (asset.status === 'analyzing') {
-      const last = asset.stages[asset.stages.length - 1];
-      status = `<div class="a-status"><span class="spinner"></span> analyzing… ${STAGE_LABELS[last] || 'starting'}</div>`;
-    } else if (asset.status === 'error') {
-      status = `<div class="a-status error">analysis failed</div>`;
-    } else if (asset.analysis) {
-      const bits = [];
-      if (asset.analysis.meta.duration) bits.push(`${Math.round(asset.analysis.meta.duration * 10) / 10}s`);
-      for (const t of asset.analysis.tags || []) bits.push(t);
-      if (asset.analysis.bpm) bits.push(`${asset.analysis.bpm} bpm`);
-      if (asset.analysis.scenes?.length) bits.push(`${asset.analysis.scenes.length + 1} scenes`);
-      status = `<div class="a-tags">${bits.map(b => `<span>${b}</span>`).join('')}</div>`;
+    updateMediaItem(node, asset);
+  }
+  for (const [id, node] of mediaNodes) {
+    if (!seen.has(id)) {
+      node.root.remove();
+      mediaNodes.delete(id);
     }
-
-    el.innerHTML = `
-      <button class="remove" title="Remove">×</button>
-      ${thumb}
-      <div class="name" title="${asset.name}">${asset.name}</div>
-      ${status}
-      <div class="a-actions">
-        <button class="add" ${asset.status !== 'ready' ? 'disabled' : ''}>+ Add</button>
-        ${asset.analysis?.highlight ? `<button class="best" title="Add just the suggested highlight ${asset.analysis.highlight.start}–${asset.analysis.highlight.end}s">★ Best</button>` : ''}
-      </div>`;
-
-    el.querySelector('.remove').addEventListener('click', async () => {
-      await api(`/api/assets/${encodeURIComponent(asset.id)}`, { method: 'DELETE' });
-      state.assets = state.assets.filter(a => a.id !== asset.id);
-      renderMedia();
-    });
-    el.querySelector('.add').addEventListener('click', () => addAssetToTimeline(asset));
-    el.querySelector('.best')?.addEventListener('click', () => addAssetToTimeline(asset, asset.analysis.highlight));
-    mediaList.appendChild(el);
   }
 }
 
@@ -275,7 +316,7 @@ function buildClipDiv(clip, track, def) {
   const extras = [];
   if (clip.speed !== 1) extras.push(`${clip.speed}x`);
   if (clip.muted) extras.push('🔇');
-  el.innerHTML = `<span class="c-label">${extras.join(' ')} ${label}</span><div class="h h-l"></div><div class="h h-r"></div>`;
+  el.innerHTML = `<span class="c-label">${esc(`${extras.join(' ')} ${label}`)}</span><div class="h h-l"></div><div class="h h-r"></div>`;
 
   // waveform for audio clips
   const asset = state.assets.find(a => a.id === clip.assetId);
@@ -552,7 +593,7 @@ function appendBubble(cls, html, asText = true) {
 function appendToolChip(container, name, summary, error) {
   const chip = document.createElement('div');
   chip.className = 'tool-chip' + (error ? ' error' : '');
-  chip.innerHTML = `<span class="tool-name">${name}</span> ${error || summary || ''}`;
+  chip.innerHTML = `<span class="tool-name">${esc(name)}</span> ${esc(error || summary || '')}`;
   container.appendChild(chip);
   chatLog.scrollTop = chatLog.scrollHeight;
 }

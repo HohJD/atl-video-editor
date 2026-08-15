@@ -16,6 +16,14 @@ Agentic timeline video editor. Express server + vanilla JS frontend, HyperFrames
 
 - Run dev server: `npm run dev` (http://localhost:3000)
 - Tests (op layer golden fixtures): `npm test`
+- UI smoke test (headless Chrome, needs running server + /tmp/atl-test media): `node tests/ui-smoke.mjs` — screenshots land in /tmp/atl-ui-shots
+
+## Security posture (keep it this way)
+
+- Server binds `127.0.0.1` only (`ATL_HOST` env to override deliberately); never expose on 0.0.0.0
+- Same-origin guard middleware rejects requests with a non-localhost `Origin` header — do not add permissive CORS
+- All user-controlled strings rendered via `esc()` in `public/app.js` — never interpolate raw values into `innerHTML`
+- Electron: `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true`, devTools disabled
 - Syntax check all: `for f in server.mjs server/*.mjs public/app.js public/preview-runtime.js; do node --check $f; done`
 - Build macOS DMG: `npx electron-builder --mac --arm64 --publish=never` (output in `release-builds/`)
   - NOTE: unset `ELECTRON_RUN_AS_NODE` before launching Electron from a shell.

@@ -1,6 +1,6 @@
 {
   "name": "atl-video-editor",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Automated video editor powered by HyperFrames",
   "type": "module",
   "main": "electron/main.cjs",
@@ -19,7 +19,6 @@
   "dependencies": {
     "@hyperframes/producer": "^0.7.90",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "cors": "^2.8.6",
     "express": "^5.2.1",
     "hyperframes": "^0.7.90",
     "multer": "^2.2.0",

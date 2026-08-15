@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import { spawn } from 'child_process';
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
@@ -7,7 +6,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import multer from 'multer';
 import { emptyEDL, applyOp, edlDuration, toolDefinitions } from './server/edl.mjs';
-import { analyzeAsset, whisperAvailable, groupWordsToCues } from './server/analyze.mjs';
+import { analyzeAsset, whisperAvailable, groupWordsToCues, deriveTags } from './server/analyze.mjs';
 import { prepareExportAssets, compileExport } from './server/compile.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -20,8 +19,31 @@ const CLI = path.join(__dirname, 'node_modules', 'hyperframes', 'bin', 'hyperfra
 const NODE_EXE = process.env.ATL_NODE_EXE || process.execPath;
 const PROJECT_FILE = path.join(PROJECTS_DIR, 'project.json');
 
+// Local-only by default. The app is a desktop tool: never expose it to the
+// network unless the user explicitly opts in via ATL_HOST.
+const HOST = process.env.ATL_HOST || '127.0.0.1';
+
 const app = express();
-app.use(cors());
+
+// Same-origin guard: browsers only attach an Origin header on cross-origin or
+// state-changing requests. Reject anything that doesn't come from our own UI,
+// which blocks malicious webpages from driving the editor or exfiltrating media.
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    let host = null;
+    try { host = new URL(origin).hostname; } catch { /* malformed */ }
+    if (host !== 'localhost' && host !== '127.0.0.1' && host !== HOST) {
+      return res.status(403).json({ error: 'Cross-origin requests are not allowed' });
+    }
+  }
+  next();
+});
+
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -130,7 +152,7 @@ function publicAsset(a) {
       beats: a.analysis.beats?.beats ?? [],
       peaks: a.analysis.peaks,
       silence: a.analysis.silence,
-      tags: a.analysis.tags,
+      tags: deriveTags(a.analysis.meta, a.analysis),
       highlight: a.analysis.highlight,
       hasTranscript: Boolean(a.analysis.transcript),
       transcriptPreview: a.analysis.transcript?.text?.slice(0, 200) ?? null
@@ -712,6 +734,6 @@ await fs.mkdir(PROJECTS_DIR, { recursive: true });
 await fs.mkdir(UPLOADS_DIR, { recursive: true });
 await fs.mkdir(CACHE_DIR, { recursive: true });
 await restore();
-app.listen(PORT, () => {
-  console.log(`ATL Video Editor server running at http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`ATL Video Editor server running at http://${HOST}:${PORT}`);
 });

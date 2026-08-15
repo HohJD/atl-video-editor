@@ -334,8 +334,10 @@ export function groupWordsToCues(words, { maxWords = 4, maxDur = 2.8, maxGap = 0
 
 export function deriveTags(meta, { transcript, beats, scenes }) {
   const tags = [];
-  if (meta.hasVideo) tags.push('video');
-  if (!meta.hasVideo && meta.hasAudio) tags.push('audio');
+  const isImage = meta.hasVideo && !meta.hasAudio && (!meta.duration || meta.duration < 0.5);
+  if (isImage) tags.push('image');
+  else if (meta.hasVideo) tags.push('video');
+  else if (meta.hasAudio) tags.push('audio');
   if (transcript && transcript.words.length > meta.duration * 0.5) tags.push('speech');
   if (beats?.bpm && (!transcript || transcript.words.length < meta.duration * 0.5)) tags.push('music');
   if (scenes?.length > 3) tags.push('multi-scene');
