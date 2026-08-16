@@ -1,4 +1,4 @@
-# ATL Video Editor
+# AI Video Editor
 
 Agentic timeline video editor. Express server + vanilla JS frontend, HyperFrames (HTML→MP4) as the export renderer, Electron for the macOS app.
 

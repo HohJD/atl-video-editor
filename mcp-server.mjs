@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// MCP server for ATL Video Editor.
+// MCP server for AI Video Editor.
 // Lets Claude Code (or any MCP client) drive the editor through the same op
 // layer the UI and built-in agent use. Proxies to the running app's HTTP API,
 // so every edit shows up live in the editor window.
 //
-// Register once:  claude mcp add atl-video -- node /path/to/mcp-server.mjs
-// The ATL Video Editor app (or `npm run dev`) must be running.
+// Register once:  claude mcp add ai-video -- node /path/to/mcp-server.mjs
+// The AI Video Editor app (or `npm run dev`) must be running.
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -33,7 +33,7 @@ async function resolveBaseUrl() {
       if (r.ok) { baseUrl = url; return url; }
     } catch { /* try next */ }
   }
-  throw new Error('ATL Video Editor is not running. Launch the app (or `npm run dev` in the project) and try again.');
+  throw new Error('AI Video Editor is not running. Launch the app (or `npm run dev` in the project) and try again.');
 }
 
 async function api(method, route, body) {

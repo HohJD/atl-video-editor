@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ATL Video Editor</title>
+  <title>AI Video Editor</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236366f1'/%3E%3Cstop offset='1' stop-color='%23a855f7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='7' fill='url(%23g)'/%3E%3Cpath d='M12 10l10 6-10 6z' fill='white'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -11,7 +11,7 @@
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <span class="logo">ATL</span>
+        <span class="logo">AI</span>
         <span>Video Editor</span>
       </div>
       <div class="proj-settings">
@@ -72,6 +72,7 @@
           </span>
         </div>
         <div id="keySettings" class="key-settings hidden">
+          <div class="opt-title">Option A — Anthropic API key</div>
           <label>Model
             <select id="aiModel">
               <option value="claude-sonnet-5" selected>Claude Sonnet 5</option>
@@ -79,11 +80,19 @@
               <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
             </select>
           </label>
-          <label class="password">Anthropic API key
+          <label class="password">API key
             <input type="password" id="aiApiKey" placeholder="sk-ant-…">
             <button type="button" id="toggleKey">Show</button>
           </label>
-          <small>Stored only on this device.</small>
+          <small>Stored only on this device. Create one at <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a> — enables the chat below.</small>
+          <div class="opt-divider"></div>
+          <div class="opt-title">Option B — Claude Code (your Claude subscription)</div>
+          <small>No API key needed. Register this editor as a Claude Code tool, then chat in Claude Code — the timeline here updates live.</small>
+          <div class="mcp-cmd">
+            <code id="mcpCmd">claude mcp add --scope user ai-video -- node …</code>
+            <button type="button" id="copyMcp">Copy</button>
+          </div>
+          <small>Run once in Terminal (needs <b>Claude Code</b> + Node.js 22+). Then tell Claude Code things like “import ~/Movies/clip.mp4 into my video editor and cut it to the beat”.</small>
         </div>
         <div id="chatLog" class="chat-log">
           <div class="chat-bubble assistant">I can edit the timeline for you. Try:<br>• “add my clip and cut it to the beat”<br>• “auto-caption it, karaoke style”<br>• “make it vertical for Reels”<br>• “slow-mo the first 3 seconds”</div>
@@ -135,7 +144,7 @@
       </div>
       <video id="exportVideo" class="hidden" controls></video>
       <div id="exportDone" class="export-done hidden">
-        <a id="downloadLink" class="btn-link" download="atl-video.mp4">Download MP4</a>
+        <a id="downloadLink" class="btn-link" download="ai-video.mp4">Download MP4</a>
         <button id="closeExport" type="button">Close</button>
       </div>
     </div>

@@ -1,4 +1,4 @@
-// ATL Video Editor frontend: media bin, preview transport, multi-track timeline,
+// AI Video Editor frontend: media bin, preview transport, multi-track timeline,
 // agent chat with tool traces. All edits (mouse or agent) go through the same op API.
 
 const $ = id => document.getElementById(id);
@@ -113,6 +113,7 @@ async function loadProject() {
   state.historyLength = p.historyLength;
   setEDL(p.edl, p.duration, p.cursor);
   renderMedia();
+  if (p.capabilities.mcpCommand) $('mcpCmd').textContent = p.capabilities.mcpCommand;
   if (!p.capabilities.whisper) showToast('whisper.cpp not found — captions/transcripts disabled', 'error', 6000);
   scheduleAssetPoll();
 }
@@ -574,6 +575,14 @@ $('toggleKey').addEventListener('click', () => {
   const inp = $('aiApiKey');
   inp.type = inp.type === 'password' ? 'text' : 'password';
   $('toggleKey').textContent = inp.type === 'password' ? 'Show' : 'Hide';
+});
+$('copyMcp').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('mcpCmd').textContent);
+    showToast('Command copied — paste it in Terminal', 'success');
+  } catch {
+    showToast('Copy failed — select the command manually', 'error');
+  }
 });
 $('chatResetBtn').addEventListener('click', async () => {
   await api('/api/agent/reset', { method: 'POST' });

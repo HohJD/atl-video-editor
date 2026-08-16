@@ -192,7 +192,28 @@ input[type="file"] { display: none; }
 .key-settings {
   padding: 10px 12px; border-bottom: 1px solid var(--border);
   display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+  max-height: 45vh; overflow-y: auto;
 }
+
+.opt-title {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: #b6b9f8;
+}
+
+.opt-divider { border-top: 1px solid var(--border); margin: 4px 0; }
+
+.key-settings small a { color: #b6b9f8; text-decoration: underline; }
+
+.mcp-cmd {
+  display: flex; gap: 6px; align-items: stretch;
+}
+.mcp-cmd code {
+  flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem; background: var(--panel-2);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 8px; overflow-x: auto; white-space: nowrap;
+}
+.mcp-cmd button { padding: 4px 10px; font-size: 0.72rem; flex-shrink: 0; }
 .password { position: relative; }
 .password input { padding-right: 52px; }
 .password button {

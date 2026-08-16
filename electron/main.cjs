@@ -13,7 +13,7 @@ process.env.ATL_PROJECTS_DIR = path.join(app.getPath('userData'), 'projects');
 const serverPath = path.join(__dirname, '..', 'server.mjs');
 
 function log(...args) {
-  console.log('[ATL]', ...args);
+  console.log('[AI-VE]', ...args);
 }
 
 function findChrome() {
@@ -120,7 +120,7 @@ async function createWindow() {
     minWidth: 960,
     minHeight: 640,
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
-    title: 'ATL Video Editor',
+    title: 'AI Video Editor',
     autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,
@@ -140,7 +140,7 @@ app.whenReady().then(async () => {
     await startServer();
     await createWindow();
   } catch (err) {
-    dialog.showErrorBox('Failed to start ATL Video Editor', err.message);
+    dialog.showErrorBox('Failed to start AI Video Editor', err.message);
     app.quit();
   }
 });

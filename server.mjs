@@ -168,7 +168,10 @@ function projectPayload() {
     historyLength: project.history.length,
     history: project.history.map(h => ({ id: h.id, op: h.op, summary: h.summary, source: h.source, ts: h.ts })),
     assets: Object.values(project.assets).map(publicAsset),
-    capabilities: { whisper: whisperAvailable() }
+    capabilities: {
+      whisper: whisperAvailable(),
+      mcpCommand: `claude mcp add --scope user ai-video -- node "${path.join(__dirname, 'mcp-server.mjs')}"`
+    }
   };
 }
 
@@ -493,7 +496,7 @@ function describeEDL() {
 }
 
 function agentSystemPrompt() {
-  return `You are the editing agent inside ATL Video Editor, a timeline-based video editor. You edit by calling tools that operate on the timeline document. The user sees every tool call you make, and the timeline updates live.
+  return `You are the editing agent inside AI Video Editor, a timeline-based video editor. You edit by calling tools that operate on the timeline document. The user sees every tool call you make, and the timeline updates live.
 
 Tracks: V1 (main video/images), O1+O2 (text/title overlays), C1 (captions), A1 (music/audio).
 
@@ -735,5 +738,5 @@ await fs.mkdir(UPLOADS_DIR, { recursive: true });
 await fs.mkdir(CACHE_DIR, { recursive: true });
 await restore();
 app.listen(PORT, HOST, () => {
-  console.log(`ATL Video Editor server running at http://${HOST}:${PORT}`);
+  console.log(`AI Video Editor server running at http://${HOST}:${PORT}`);
 });
