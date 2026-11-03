@@ -21,7 +21,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "express": "^5.2.1",
     "hyperframes": "^0.7.90",
-    "multer": "^2.2.0",
+    "multer": "^2.5.0",
     "uuid": "^14.0.1"
   },
   "devDependencies": {
